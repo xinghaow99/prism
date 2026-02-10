@@ -1,0 +1,15 @@
+task: pg19
+dataset_path: emozilla/pg19
+output_type: loglikelihood_rolling
+training_split: train
+validation_split: validation
+test_split: test
+doc_to_text: ""
+doc_to_target: "{{text}}"
+process_results: !function utils.process_results
+metric_list:
+  - metric: word_perplexity
+  - metric: byte_perplexity
+  - metric: bits_per_byte
+metadata:
+  version: 1.0
