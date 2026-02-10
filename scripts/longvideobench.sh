@@ -1,5 +1,5 @@
 #!/bin/bash
-# Configuration for Evaluation with Prism Attention on LongVideoBench
+
 GPUS=${GPUS:-8}
 MODEL=${MODEL:-"Qwen/Qwen3-VL-8B-Instruct"}
 TASKS=${TASKS:-"longvideobench_val_v"}
@@ -27,7 +27,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE="prism"
+export PATCH_TYPE="prism" # none, minference, flexprefill, xattn, prism
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 export LOW_FREQ_DIM=${LOW_FREQ_DIM:-96}

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Configuration for PG19 evaluation with Prism Attention
+
 GPUS=${GPUS:-1}
 MODEL=${MODEL:-"meta-llama/Llama-3.1-8B-Instruct"}
 TASKS=${TASKS:-"pg19"}
 BATCH_SIZE=${BATCH_SIZE:-1}
-# Context lengths to evaluate
+
 CONTEXT_LENGTHS=${CONTEXT_LENGTHS:-"4096 8192 16384 32768 65536 131072"}
 APPLY_CHAT_TEMPLATE=${APPLY_CHAT_TEMPLATE:-"false"}
 LOG_SAMPLES=${LOG_SAMPLES:-"false"}
@@ -26,7 +26,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE="prism"
+export PATCH_TYPE="prism" # none, minference, flexprefill, xattn, prism
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 export LOW_FREQ_DIM=${LOW_FREQ_DIM:-96}

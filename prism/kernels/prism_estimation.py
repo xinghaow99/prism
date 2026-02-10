@@ -277,7 +277,7 @@ def _top_p_selection_kernel(
     B, H, Q_BLOCKS, K_BLOCKS,
     high_threshold,
     low_threshold,
-    BLOCK_K: tl.constexpr,  # 必须是 >= K_BLOCKS 的 2 的幂
+    BLOCK_K: tl.constexpr,  # Must be a power of two >= K_BLOCKS
 ):
     pid_q = tl.program_id(0)
     pid_bh = tl.program_id(1)
@@ -288,11 +288,11 @@ def _top_p_selection_kernel(
     b = pid_bh // H
     h = pid_bh - b * H
 
-    # 偏移计算
+    # Offset calculation
     offs_k = tl.arange(0, BLOCK_K)
     mask_k = offs_k < K_BLOCKS
 
-    # --- 处理 High-freq 行 ---
+    # --- Process high-frequency row ---
     p_h_ptr = (
         PROBS_ptr
         + b * stride_p_b
@@ -302,17 +302,17 @@ def _top_p_selection_kernel(
     )
     probs_h = tl.load(p_h_ptr, mask=mask_k, other=-1.0)
     
-    # 保证排序稳定，索引大的值稍微减小一点点
+    # Keep sorting stable by slightly decreasing larger-index values
     p_eps_h = probs_h - offs_k.to(tl.float32) * 1e-9
     sorted_h = tl.sort(p_eps_h, descending=True)
     cumsum_h = tl.cumsum(sorted_h)
     
-    # 确定选中的最小 epsilon 值作为阈值
+    # Use the minimum selected epsilon value as threshold
     is_selected_h = (cumsum_h - sorted_h) < high_threshold
     threshold_v_h = tl.min(tl.where(is_selected_h & (sorted_h >= -0.5), sorted_h, 2.0))
     selected_h_mask = p_eps_h >= threshold_v_h
 
-    # --- 处理 Low-freq 行 ---
+    # --- Process low-frequency row ---
     p_l_ptr = (
         PROBS_ptr
         + b * stride_p_b
@@ -330,7 +330,7 @@ def _top_p_selection_kernel(
     threshold_v_l = tl.min(tl.where(is_selected_l & (sorted_l >= -0.5), sorted_l, 2.0))
     selected_l_mask = p_eps_l >= threshold_v_l
 
-    # --- 合并并写回 ---
+    # --- Merge and write back ---
     final_mask = selected_h_mask | selected_l_mask
     
     out_ptr = (
@@ -475,7 +475,7 @@ if __name__ == "__main__":
     low_thr = 0.95
     
     if not args.skip_correctness:
-        # 1. 使用 PyTorch 计算出的参考 probs (probs_ref)
+        # 1. Use PyTorch reference probabilities (probs_ref)
         probs_h_ref = probs_ref[:, :, :q_blocks_n, :]
         probs_l_ref = probs_ref[:, :, q_blocks_n:, :]
         
@@ -484,8 +484,8 @@ if __name__ == "__main__":
         mask_l_ref = top_p_select(probs_l_ref, low_thr, causal=True)
         mask_ref = mask_h_ref | mask_l_ref
         
-        # 2. 将 PyTorch 的 probs 喂给 Triton Selection Kernel
-        # 这样可以消除 Softmax 阶段引入的数值差异，只测试选择逻辑
+        # 2. Feed PyTorch probabilities to the Triton selection kernel
+        # This removes numerical differences from the softmax stage and tests selection logic only
         mask_triton_clean = top_p_selection_triton(probs_ref, high_thr, low_thr)
         
         # Compare
@@ -494,7 +494,7 @@ if __name__ == "__main__":
         if diff_clean == 0:
             print("Pure Selection Logic check passed: Triton selection is bit-accurate to PyTorch when given same inputs.")
 
-        # 3. 同时也显示一下原始对比（包含 Softmax 误差的）
+        # 3. Also show the original comparison (including softmax error)
         mask_triton_original = top_p_selection_triton(probs_triton, high_thr, low_thr)
         diff_orig = (mask_ref != mask_triton_original).sum().item()
         print(f"Combined Correctness (Softmax + Select): diff={diff_orig} / {mask_ref.numel()} (ratio: {diff_orig/mask_ref.numel():.6f})")

@@ -7,15 +7,15 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 cd "$ROOT_DIR"
 
-# Keep positional compatibility with the original script where possible.
+
 MODEL_ID=${1:-"meta-llama/Llama-3.1-8B-Instruct"}
 SEQ_LENS=${2:-"8192,16384,32768,65536,131072"}
 BATCH_SIZE=${3:-1}
 LOW_FREQ_DIM=${5:-96}
 HIGH_FREQ_DIM=${6:-64}
 BLOCK_SIZE=${7:-128}
-LOW_FREQ_THRESHOLD=${8:-0.92}
-HIGH_FREQ_THRESHOLD=${9:-0.92}
+LOW_FREQ_THRESHOLD=${8:-0.95}
+HIGH_FREQ_THRESHOLD=${9:-0.95}
 CALIBRATE=${CALIBRATE:-"true"}
 USE_TRITON_LOGITS=${USE_TRITON_LOGITS:-"true"}
 USE_TRITON_SELECT=${39:-"true"}
@@ -34,8 +34,8 @@ MINFERENCE_SLASH_SIZE=${36:-2048}
 MINFERENCE_ADAPTIVE_BUDGET=${37:-""}
 
 ATTN_ONLY_LAYER_IDX=${41:-"12"}
-NO_DENSITY=${44:-"false"}
-NO_SELECT_TIME=${45:-"false"}
+NO_DENSITY=${44:-"true"}
+NO_SELECT_TIME=${45:-"true"}
 
 INCLUDE_FLASH=${48:-"true"}
 INCLUDE_MINFERENCE=${49:-"true"}

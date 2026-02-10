@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Configuration for Evaluation with Prism Attention
+
 GPUS=${GPUS:-8}
 MODEL=${MODEL:-"Qwen/Qwen3-8B"}
 # MODEL=${MODEL:-"meta-llama/Llama-3.1-8B-Instruct"}
@@ -26,7 +26,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE="xattn" # none, minference, flexprefill, xattn
+export PATCH_TYPE="prism" # none, minference, flexprefill, xattn, prism
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 export LOW_FREQ_DIM=${LOW_FREQ_DIM:-96}

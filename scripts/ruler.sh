@@ -1,16 +1,15 @@
 #!/bin/bash
 
-# Configuration for RULER evaluation with Prism Attention
+
 NUM_SAMPLES=${NUM_SAMPLES:-100}
 GPUS=${GPUS:-1}
-# Default RULER lengths
+
 MAX_SEQ_LENGTHS=${MAX_SEQ_LENGTHS:-"4096,8192,16384,32768,65536,131072"}
 
 MODEL=${MODEL:-"Qwen/Qwen3-8B"} # Should be YaRN-extrapolated
 # MODEL=${MODEL:-"meta-llama/Llama-3.1-8B-Instruct"}
 TASKS=${TASKS:-"ruler"}
 BATCH_SIZE=${BATCH_SIZE:-1}
-# For RULER, we usually want a large max_length in model_args to accommodate the longest test sequence
 MAX_LENGTH=${MAX_LENGTH:-131072}
 APPLY_CHAT_TEMPLATE=${APPLY_CHAT_TEMPLATE:-"true"}
 LOG_SAMPLES=${LOG_SAMPLES:-"false"}
@@ -31,7 +30,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE="prism"
+export PATCH_TYPE="prism" # none, minference, flexprefill, xattn, prism
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 # Prism Attention Hyperparameters
