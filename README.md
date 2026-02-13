@@ -1,5 +1,6 @@
 # Prism: Spectral-Aware Block-Sparse Attention
-<a href="https://arxiv.org/abs/2602.08426" target="_blank"> <img src="https://img.shields.io/badge/arXiv-2602.08426-%23B41A1B?logo=arxiv&link=https%3A%2F%2Farxiv.org%2Fabs%2F2602.08426"></a>
+<a href="https://arxiv.org/abs/2602.08426" target="_blank"> <img src="https://img.shields.io/badge/arXiv-2602.08426-%23B41A1B?logo=arxiv&link=https%3A%2F%2Farxiv.org%2Fabs%2F2602.08426"></a> <a href="https://efficacious-citrus-7a0.notion.site/Prism-Spectral-Aware-Block-Sparse-Attention-304d97f5df9d80318802f9cb37d18c3e" target="_blank"> <img src="https://img.shields.io/badge/Blog-Prism-black?logo=notion&logoColor=%23000000&labelColor=white&link=https%3A%2F%2Fefficacious-citrus-7a0.notion.site%2FPrism-Spectral-Aware-Block-Sparse-Attention-304d97f5df9d80318802f9cb37d18c3e
+"></a>
 ## Overview
 Prism is a training-free method to accelerate long-context LLM pre-filling. It addresses the "blind spot" in standard mean pooling caused by Rotary Positional Embeddings (RoPE) by disentangling attention into high-frequency and low-frequency bands.
 
