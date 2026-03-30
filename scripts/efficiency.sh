@@ -14,8 +14,8 @@ BATCH_SIZE=${3:-1}
 LOW_FREQ_DIM=${5:-96}
 HIGH_FREQ_DIM=${6:-64}
 BLOCK_SIZE=${7:-128}
-LOW_FREQ_THRESHOLD=${8:-0.95}
-HIGH_FREQ_THRESHOLD=${9:-0.95}
+LOW_FREQ_THRESHOLD=${8:-0.93}
+HIGH_FREQ_THRESHOLD=${9:-0.93}
 CALIBRATE=${CALIBRATE:-"true"}
 USE_TRITON_LOGITS=${USE_TRITON_LOGITS:-"true"}
 USE_TRITON_SELECT=${39:-"true"}
@@ -42,9 +42,16 @@ INCLUDE_MINFERENCE=${49:-"true"}
 INCLUDE_FLEXPREFILL=${50:-"true"}
 INCLUDE_XATTENTION=${51:-"true"}
 INCLUDE_PRISM=${52:-"true"}
+INCLUDE_SPARGE=${53:-"true"}
 
 XATTN_STRIDE=${XATTN_STRIDE:-8}
 XATTN_THRESHOLD=${XATTN_THRESHOLD:-0.9}
+
+SPARGE_SIMTHRESHD=${SPARGE_SIMTHRESHD:-0.6}
+SPARGE_CDFTHRESHD=${SPARGE_CDFTHRESHD:-0.98}
+SPARGE_PVTHRESHD=${SPARGE_PVTHRESHD:-50.0}
+SPARGE_SMOOTH_K=${SPARGE_SMOOTH_K:-"true"}
+SPARGE_ATTENTION_SINK=${SPARGE_ATTENTION_SINK:-"true"}
 FORCE_SINK=${FORCE_SINK:-"true"}
 FORCE_RECENT=${FORCE_RECENT:-"true"}
 
@@ -83,6 +90,9 @@ echo "Include Minference: $INCLUDE_MINFERENCE"
 echo "Include FlexPrefill: $INCLUDE_FLEXPREFILL"
 echo "Include XAttention: $INCLUDE_XATTENTION"
 echo "Include Prism: $INCLUDE_PRISM"
+echo "Include SpargeAttn: $INCLUDE_SPARGE"
+echo "SpargeAttn SimThreshd: $SPARGE_SIMTHRESHD"
+echo "SpargeAttn CDFThreshd: $SPARGE_CDFTHRESHD"
 echo "================================================================"
 
 ARGS=(
@@ -102,6 +112,9 @@ ARGS=(
     --flexprefill_tau "$FLEX_PREFILL_TAU"
     --minference_vertical_size "$MINFERENCE_VERTICAL_SIZE"
     --minference_slash_size "$MINFERENCE_SLASH_SIZE"
+    --sparge_simthreshd "$SPARGE_SIMTHRESHD"
+    --sparge_cdfthreshd "$SPARGE_CDFTHRESHD"
+    --sparge_pvthreshd "$SPARGE_PVTHRESHD"
     --num_warmup 3
     --num_runs 5
 )
@@ -144,6 +157,16 @@ fi
 if [ -n "$MINFERENCE_ADAPTIVE_BUDGET" ]; then
     ARGS+=(--minference_adaptive_budget "$MINFERENCE_ADAPTIVE_BUDGET")
 fi
+if [ "$SPARGE_SMOOTH_K" = "true" ]; then
+    ARGS+=(--sparge_smooth_k)
+else
+    ARGS+=(--no_sparge_smooth_k)
+fi
+if [ "$SPARGE_ATTENTION_SINK" = "true" ]; then
+    ARGS+=(--sparge_attention_sink)
+else
+    ARGS+=(--no_sparge_attention_sink)
+fi
 if [ -n "$ATTN_ONLY_LAYER_IDX" ]; then
     ARGS+=(--attn_only_layer_idx "$ATTN_ONLY_LAYER_IDX")
 fi
@@ -166,6 +189,9 @@ if [ "$INCLUDE_FLEXPREFILL" = "true" ]; then
 fi
 if [ "$INCLUDE_XATTENTION" = "true" ]; then
     if [ -n "$METHODS" ]; then METHODS="$METHODS,XAttention"; else METHODS="XAttention"; fi
+fi
+if [ "$INCLUDE_SPARGE" = "true" ]; then
+    if [ -n "$METHODS" ]; then METHODS="$METHODS,SpargeAttn"; else METHODS="SpargeAttn"; fi
 fi
 if [ "$INCLUDE_PRISM" = "true" ]; then
     if [ -n "$METHODS" ]; then METHODS="$METHODS,Prism"; else METHODS="Prism"; fi

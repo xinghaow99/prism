@@ -30,7 +30,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE="prism" # none, minference, flexprefill, xattn, prism
+export PATCH_TYPE=${PATCH_TYPE:-"prism"} # none, minference, flexprefill, xattn, prism, sparge
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 # Prism Attention Hyperparameters

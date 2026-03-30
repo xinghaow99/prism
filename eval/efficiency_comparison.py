@@ -20,6 +20,7 @@ from prism import prism as prism_module
 import baselines.XAttention as xattn_module
 import baselines.FlexPrefill as flexprefill_module
 import baselines.Minference as minference_module
+import baselines.SpargeAttn as sparge_module
 
 class StopForward(Exception):
     pass
@@ -91,6 +92,7 @@ def _reload_patch_modules() -> None:
     importlib.reload(xattn_module)
     importlib.reload(flexprefill_module)
     importlib.reload(minference_module)
+    importlib.reload(sparge_module)
 
 def _build_method_registry():
     return {
@@ -113,6 +115,10 @@ def _build_method_registry():
         "Prism": {
             "forward_fn": prism_module.prism_attention_forward,
             "stat_collector": prism_module.STAT_COLLECTOR,
+        },
+        "SpargeAttn": {
+            "forward_fn": sparge_module.sparge_attention_forward,
+            "stat_collector": sparge_module.STAT_COLLECTOR,
         },
     }
 
@@ -310,10 +316,22 @@ def main():
     parser.add_argument("--minference_vertical_size", type=int, default=1000)
     parser.add_argument("--minference_slash_size", type=int, default=6096)
     parser.add_argument("--minference_adaptive_budget", type=float, default=None)
+
+    # SpargeAttn args
+    parser.add_argument("--sparge_simthreshd", type=float, default=0.6)
+    parser.add_argument("--sparge_cdfthreshd", type=float, default=0.98)
+    parser.add_argument("--sparge_pvthreshd", type=float, default=50.0)
+    parser.add_argument("--sparge_smooth_k", dest="sparge_smooth_k", action="store_true")
+    parser.add_argument("--no_sparge_smooth_k", dest="sparge_smooth_k", action="store_false")
+    parser.set_defaults(sparge_smooth_k=True)
+    parser.add_argument("--sparge_attention_sink", dest="sparge_attention_sink", action="store_true")
+    parser.add_argument("--no_sparge_attention_sink", dest="sparge_attention_sink", action="store_false")
+    parser.set_defaults(sparge_attention_sink=True)
+
     parser.add_argument(
         "--methods",
         type=str,
-        default="FlashAttention,Minference,FlexPrefill,XAttention,Prism",
+        default="FlashAttention,Minference,FlexPrefill,XAttention,SpargeAttn,Prism",
         help="Comma-separated methods to benchmark",
     )
     
@@ -368,10 +386,15 @@ def main():
     os.environ["MINFERENCE_VERTICAL_SIZE"] = str(args.minference_vertical_size)
     os.environ["MINFERENCE_SLASH_SIZE"] = str(args.minference_slash_size)
     _set_or_unset_env("MINFERENCE_ADAPTIVE_BUDGET", args.minference_adaptive_budget)
+    os.environ["SPARGE_SIMTHRESHD"] = str(args.sparge_simthreshd)
+    os.environ["SPARGE_CDFTHRESHD"] = str(args.sparge_cdfthreshd)
+    os.environ["SPARGE_PVTHRESHD"] = str(args.sparge_pvthreshd)
+    os.environ["SPARGE_SMOOTH_K"] = "true" if args.sparge_smooth_k else "false"
+    os.environ["SPARGE_ATTENTION_SINK"] = "true" if args.sparge_attention_sink else "false"
 
     _reload_patch_modules()
     method_registry = _build_method_registry()
-    method_order = ["FlashAttention", "Minference", "FlexPrefill", "XAttention", "Prism"]
+    method_order = ["FlashAttention", "Minference", "FlexPrefill", "XAttention", "SpargeAttn", "Prism"]
     selected_method_names = [m.strip() for m in args.methods.split(",") if m.strip()]
     methods = []
     for method_name in method_order:

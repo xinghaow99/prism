@@ -41,8 +41,13 @@ def _load_patch_context(patch_type: str):
 
         return minference.minference_attention_forward, minference.STAT_COLLECTOR
 
+    if patch_type == "sparge":
+        import baselines.SpargeAttn as sparge
+
+        return sparge.sparge_attention_forward, sparge.STAT_COLLECTOR
+
     raise ValueError(
-        f"Unsupported PATCH_TYPE: {patch_type}. Expected one of: none, prism, xattn, flexprefill, minference"
+        f"Unsupported PATCH_TYPE: {patch_type}. Expected one of: none, prism, xattn, flexprefill, minference, sparge"
     )
 
 
