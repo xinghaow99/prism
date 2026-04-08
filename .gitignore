@@ -4,3 +4,5 @@ build
 results
 tests
 logs
+# HunyuanVideo model weights (not committed)
+eval/HunyuanVideo/ckpts/

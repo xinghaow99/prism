@@ -39,6 +39,7 @@ def mean_pool(x, block_size):
 def get_low_freq_components(states, low_freq_dim):
     """
     Extracts the low-frequency components from query or key states.
+    For 1D RoPE layout [0,1,2,...,d/2-1, 0,1,2,...,d/2-1] (all reals then all imags).
     low_freq_dim: the number of dimensions to extract (must be even).
     """
     head_dim = states.shape[-1]
@@ -51,6 +52,7 @@ def get_low_freq_components(states, low_freq_dim):
 def get_high_freq_components(states, high_freq_dim):
     """
     Extracts the high-frequency components from query or key states.
+    For 1D RoPE layout [0,1,2,...,d/2-1, 0,1,2,...,d/2-1] (all reals then all imags).
     high_freq_dim: the number of dimensions to extract (must be even).
     """
     head_dim = states.shape[-1]
@@ -60,6 +62,33 @@ def get_high_freq_components(states, high_freq_dim):
     part1 = states[..., : half_high]
     part2 = states[..., half_head : half_head + half_high]
     return torch.cat([part1, part2], dim=-1)
+
+
+# --- 3D RoPE frequency extraction (for DiTs like HunyuanVideo) ---
+# 3D RoPE layout: [t0,t0,t1,t1,..., h0,h0,h1,h1,..., w0,w0,w1,w1,...]
+# Each axis has paired (real,imag) dims, with lower index = higher frequency.
+
+def get_3d_high_freq_components(states, d_high_t, d_high_h, d_high_w, rope_dim_list):
+    """Extract high-frequency components per axis from 3D RoPE layout."""
+    t_dim, h_dim, w_dim = rope_dim_list
+    h_start = t_dim
+    w_start = t_dim + h_dim
+    # High freq = first N dims of each axis segment (highest frequencies)
+    t_high = states[..., :d_high_t]
+    h_high = states[..., h_start:h_start + d_high_h]
+    w_high = states[..., w_start:w_start + d_high_w]
+    return torch.cat([t_high, h_high, w_high], dim=-1)
+
+def get_3d_low_freq_components(states, d_low_t, d_low_h, d_low_w, rope_dim_list):
+    """Extract low-frequency components per axis from 3D RoPE layout."""
+    t_dim, h_dim, w_dim = rope_dim_list
+    h_end = t_dim + h_dim
+    w_end = t_dim + h_dim + w_dim
+    # Low freq = last N dims of each axis segment (lowest frequencies)
+    t_low = states[..., t_dim - d_low_t:t_dim]
+    h_low = states[..., h_end - d_low_h:h_end]
+    w_low = states[..., w_end - d_low_w:w_end]
+    return torch.cat([t_low, h_low, w_low], dim=-1)
 
 def top_p_select(
     block_attn_scores: torch.Tensor,
@@ -73,14 +102,12 @@ def top_p_select(
     Args:
         block_attn_scores: (batch_size, num_heads, q_block_num, kv_block_num)
         threshold: float, the threshold for cumulative attention scores.
-        causal: bool, Must be True. This implementation is only for causal selection.
+        causal: bool, unused. Causal constraint is enforced upstream in block_estimate.
         topk: int, if provided, select top-k blocks for each query block.
 
     Returns:
         block_mask: (batch_size, num_heads, q_block_num, kv_block_num)
     """
-    assert causal == True, "This implementation variant strictly supports causal=True."
-
     batch_size, num_heads, q_block_num, kv_block_num = block_attn_scores.shape
     device = block_attn_scores.device
     # fill nans to zeros
@@ -136,31 +163,46 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
 
 @STAT_COLLECTOR.collect
 def prism_block_estimate(
-    query_states, 
-    key_states, 
+    query_states,
+    key_states,
     low_freq_dim=LOW_FREQ_DIM,
     high_freq_dim=HIGH_FREQ_DIM,
-    block_size=BLOCK_SIZE, 
-    low_freq_threshold=LOW_FREQ_THRESHOLD, 
-    high_freq_threshold=HIGH_FREQ_THRESHOLD, 
+    block_size=BLOCK_SIZE,
+    low_freq_threshold=LOW_FREQ_THRESHOLD,
+    high_freq_threshold=HIGH_FREQ_THRESHOLD,
     low_freq_temp=LOW_FREQ_TEMP,
     high_freq_temp=HIGH_FREQ_TEMP,
     calibrate: bool = CALIBRATE,
     force_sink: bool = FORCE_SINK,
     force_recent: bool = FORCE_RECENT,
+    causal: bool = True,
+    rope_dim_list: Optional[list] = None,
+    d_high_per_axis: Optional[tuple] = None,
+    d_low_per_axis: Optional[tuple] = None,
 ):
     batch_size, num_heads, q_len, head_dim = query_states.shape
     kv_len = key_states.shape[2]
-    # Removed strict q_len == kv_len check to support sglang incremental prefill
-    # assert q_len == kv_len
 
     # Pooling & slicing on block level
     q_blocks = mean_pool(query_states, block_size)
     k_blocks = mean_pool(key_states, block_size)
-    q_high = get_high_freq_components(q_blocks, high_freq_dim)
-    q_low = get_low_freq_components(q_blocks, low_freq_dim)
-    k_high = get_high_freq_components(k_blocks, high_freq_dim)
-    k_low = get_low_freq_components(k_blocks, low_freq_dim)
+
+    if rope_dim_list is not None:
+        # 3D RoPE layout: [t0,t0,..., h0,h0,..., w0,w0,...] (paired real/imag per freq)
+        d_ht, d_hh, d_hw = d_high_per_axis
+        d_lt, d_lh, d_lw = d_low_per_axis
+        q_high = get_3d_high_freq_components(q_blocks, d_ht, d_hh, d_hw, rope_dim_list)
+        q_low = get_3d_low_freq_components(q_blocks, d_lt, d_lh, d_lw, rope_dim_list)
+        k_high = get_3d_high_freq_components(k_blocks, d_ht, d_hh, d_hw, rope_dim_list)
+        k_low = get_3d_low_freq_components(k_blocks, d_lt, d_lh, d_lw, rope_dim_list)
+        high_freq_dim = d_ht + d_hh + d_hw
+        low_freq_dim = d_lt + d_lh + d_lw
+    else:
+        # 1D RoPE layout: [0,1,...,d/2-1, 0,1,...,d/2-1] (all reals then all imags)
+        q_high = get_high_freq_components(q_blocks, high_freq_dim)
+        q_low = get_low_freq_components(q_blocks, low_freq_dim)
+        k_high = get_high_freq_components(k_blocks, high_freq_dim)
+        k_low = get_low_freq_components(k_blocks, low_freq_dim)
     num_q_blocks, num_k_blocks = q_blocks.shape[2], k_blocks.shape[2]
     # Calibration
     if calibrate:
@@ -182,43 +224,47 @@ def prism_block_estimate(
     scale_h = math.sqrt(high_freq_dim) * th
     scale_l = math.sqrt(low_freq_dim) * tl
     
-    if USE_TRITON_SELECT and USE_TRITON_LOGITS and query_states.is_cuda:
+    if USE_TRITON_SELECT and USE_TRITON_LOGITS and query_states.is_cuda and causal:
         # Fused scoring + select (partially fused via sequential triton calls)
+        # Only supported for causal mode; non-causal falls through to next branch
         probs = dual_band_softmax_triton(q_high, q_low, k_high, k_low, scale_h, scale_l)
         block_mask = top_p_selection_triton(probs, high_freq_threshold, low_freq_threshold)
-    elif USE_TRITON_LOGITS and query_states.is_cuda:
+    elif USE_TRITON_LOGITS and query_states.is_cuda and causal:
         probs = dual_band_softmax_triton(q_high, q_low, k_high, k_low, scale_h, scale_l)
         if high_freq_threshold != low_freq_threshold:
-            block_mask_high = top_p_select(probs[:, :, :num_q_blocks, :], high_freq_threshold, causal=True)
-            block_mask_low = top_p_select(probs[:, :, num_q_blocks:, :], low_freq_threshold, causal=True)
+            block_mask_high = top_p_select(probs[:, :, :num_q_blocks, :], high_freq_threshold, causal=causal)
+            block_mask_low = top_p_select(probs[:, :, num_q_blocks:, :], low_freq_threshold, causal=causal)
         else:
-            block_mask_high, block_mask_low = top_p_select(probs, high_freq_threshold, causal=True).split(num_q_blocks, dim=2)
+            block_mask_high, block_mask_low = top_p_select(probs, high_freq_threshold, causal=causal).split(num_q_blocks, dim=2)
         block_mask = block_mask_low | block_mask_high
     else:
         logits = torch.empty((batch_size, num_heads, 2*num_q_blocks, num_k_blocks), device=query_states.device)
-        # ... (keep the existing torch fallback)
         q_block_indices = torch.arange(num_q_blocks, device=query_states.device).unsqueeze(1)
         kv_block_indices = torch.arange(num_k_blocks, device=query_states.device).unsqueeze(0)
-        causal_mask = kv_block_indices <= q_block_indices + (num_k_blocks - num_q_blocks)
-        causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
-        logits[:, :, :num_q_blocks, :] = (torch.einsum("bhqd,bhkd->bhqk", q_high, k_high) / scale_h).masked_fill(~causal_mask, float("-inf"))
-        logits[:, :, num_q_blocks:, :] = (torch.einsum("bhqd,bhkd->bhqk", q_low, k_low) / scale_l).masked_fill(~causal_mask, float("-inf"))
+        if causal:
+            causal_mask = kv_block_indices <= q_block_indices + (num_k_blocks - num_q_blocks)
+            causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
+            logits[:, :, :num_q_blocks, :] = (torch.einsum("bhqd,bhkd->bhqk", q_high, k_high) / scale_h).masked_fill(~causal_mask, float("-inf"))
+            logits[:, :, num_q_blocks:, :] = (torch.einsum("bhqd,bhkd->bhqk", q_low, k_low) / scale_l).masked_fill(~causal_mask, float("-inf"))
+        else:
+            logits[:, :, :num_q_blocks, :] = torch.einsum("bhqd,bhkd->bhqk", q_high, k_high) / scale_h
+            logits[:, :, num_q_blocks:, :] = torch.einsum("bhqd,bhkd->bhqk", q_low, k_low) / scale_l
 
         probs = F.softmax(logits, dim=-1, dtype=torch.float32)
 
         if high_freq_threshold != low_freq_threshold:
-            block_mask_high = top_p_select(probs[:, :, :num_q_blocks, :], high_freq_threshold, causal=True)
-            block_mask_low = top_p_select(probs[:, :, num_q_blocks:, :], low_freq_threshold, causal=True)
+            block_mask_high = top_p_select(probs[:, :, :num_q_blocks, :], high_freq_threshold, causal=causal)
+            block_mask_low = top_p_select(probs[:, :, num_q_blocks:, :], low_freq_threshold, causal=causal)
         else:
-            block_mask_high, block_mask_low = top_p_select(probs, high_freq_threshold, causal=True).split(num_q_blocks, dim=2)
-        
+            block_mask_high, block_mask_low = top_p_select(probs, high_freq_threshold, causal=causal).split(num_q_blocks, dim=2)
+
         block_mask = block_mask_low | block_mask_high
 
-    if force_sink:
-        # keep sink block
+    if force_sink and causal:
+        # keep sink block (only meaningful for causal/autoregressive)
         block_mask[:, :, :, 0] = True
-    if force_recent:
-        # keep recent block
+    if force_recent and causal:
+        # keep recent block (only meaningful for causal/autoregressive)
         q_block_idx = torch.arange(num_q_blocks, device=block_mask.device)
         kv_block_idx = q_block_idx + (num_k_blocks - num_q_blocks)
         block_mask[:, :, q_block_idx, kv_block_idx] = True
