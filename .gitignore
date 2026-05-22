@@ -5,6 +5,7 @@ results
 tests
 logs
 **/AGENTS.md
+**/CLAUDE.md
 scripts/plot
 # HunyuanVideo model weights (not committed)
 eval/HunyuanVideo/ckpts/
