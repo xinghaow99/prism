@@ -21,6 +21,7 @@ import baselines.XAttention as xattn_module
 import baselines.FlexPrefill as flexprefill_module
 import baselines.Minference as minference_module
 import baselines.SpargeAttn as sparge_module
+import baselines.PbsAttn as pbs_attn_module
 
 class StopForward(Exception):
     pass
@@ -93,6 +94,7 @@ def _reload_patch_modules() -> None:
     importlib.reload(flexprefill_module)
     importlib.reload(minference_module)
     importlib.reload(sparge_module)
+    importlib.reload(pbs_attn_module)
 
 def _build_method_registry():
     return {
@@ -119,6 +121,10 @@ def _build_method_registry():
         "SpargeAttn": {
             "forward_fn": sparge_module.sparge_attention_forward,
             "stat_collector": sparge_module.STAT_COLLECTOR,
+        },
+        "PbsAttn": {
+            "forward_fn": pbs_attn_module.pbs_attn_attention_forward,
+            "stat_collector": pbs_attn_module.STAT_COLLECTOR,
         },
     }
 
@@ -328,10 +334,14 @@ def main():
     parser.add_argument("--no_sparge_attention_sink", dest="sparge_attention_sink", action="store_false")
     parser.set_defaults(sparge_attention_sink=True)
 
+    # PbsAttn args
+    parser.add_argument("--pbs_segment_size", type=int, default=256)
+    parser.add_argument("--pbs_threshold", type=float, default=0.9)
+
     parser.add_argument(
         "--methods",
         type=str,
-        default="FlashAttention,Minference,FlexPrefill,XAttention,SpargeAttn,Prism",
+        default="FlashAttention,Minference,FlexPrefill,XAttention,SpargeAttn,PbsAttn,Prism",
         help="Comma-separated methods to benchmark",
     )
     
@@ -391,10 +401,12 @@ def main():
     os.environ["SPARGE_PVTHRESHD"] = str(args.sparge_pvthreshd)
     os.environ["SPARGE_SMOOTH_K"] = "true" if args.sparge_smooth_k else "false"
     os.environ["SPARGE_ATTENTION_SINK"] = "true" if args.sparge_attention_sink else "false"
+    os.environ["PBS_SEGMENT_SIZE"] = str(args.pbs_segment_size)
+    os.environ["PBS_THRESHOLD"] = str(args.pbs_threshold)
 
     _reload_patch_modules()
     method_registry = _build_method_registry()
-    method_order = ["FlashAttention", "Minference", "FlexPrefill", "XAttention", "SpargeAttn", "Prism"]
+    method_order = ["FlashAttention", "Minference", "FlexPrefill", "XAttention", "SpargeAttn", "PbsAttn", "Prism"]
     selected_method_names = [m.strip() for m in args.methods.split(",") if m.strip()]
     methods = []
     for method_name in method_order:

@@ -1,4 +1,44 @@
 import os
+import sys
+import types
+import importlib.machinery
+
+# minference 0.1.6.0 guards optional imports of `kivi_gemv` and `vllm` with
+# `if _is_package_available(...)`, but newer transformers returns a
+# (bool, version) tuple which is always truthy, so the guard enters its
+# branch and the unconditional inner `import <pkg>` crashes even though the
+# package is optional and never used on our sparse-attention prefill path.
+#
+# We can't just unwrap _is_package_available globally because transformers'
+# own internals (jmespath/ggml loaders, get_torch_version) rely on the tuple
+# return. Instead, preemptively stub the optional deps in sys.modules with a
+# valid __spec__ so minference's `import <pkg>` succeeds. For vllm we also
+# set a __version__ so the fallback path inside minference's except-block
+# does not KeyError.
+def _stub_module(name, attrs=None):
+    if name in sys.modules:
+        return
+    mod = types.ModuleType(name)
+    mod.__spec__ = importlib.machinery.ModuleSpec(name, loader=None)
+    if attrs:
+        for k, v in attrs.items():
+            setattr(mod, k, v)
+    sys.modules[name] = mod
+
+
+_stub_module("kivi_gemv")
+_stub_module("papyfaiss")
+_stub_module("vllm", attrs={"__version__": "99.99.99"})
+_stub_module("vllm._custom_ops")
+_stub_module("vllm.attention")
+_stub_module("vllm.attention.ops")
+_stub_module("vllm.attention.ops.paged_attn", attrs={"PagedAttention": None})
+_stub_module("vllm.distributed", attrs={"get_tensor_model_parallel_rank": None})
+_stub_module(
+    "vllm_flash_attn",
+    attrs={"flash_attn_varlen_func": None, "flash_attn_with_kvcache": None},
+)
+
 import torch
 import torch.nn.functional as F
 import math

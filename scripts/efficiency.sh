@@ -29,13 +29,13 @@ FLEX_PREFILL_MIN_BUDGET=${32:-""}
 FLEX_PREFILL_MAX_BUDGET=${33:-""}
 FLEX_PREFILL_GQA_INTERLEAVE=${34:-"false"}
 
-MINFERENCE_VERTICAL_SIZE=${35:-512}
-MINFERENCE_SLASH_SIZE=${36:-2048}
-MINFERENCE_ADAPTIVE_BUDGET=${37:-""}
+MINFERENCE_VERTICAL_SIZE=${MINFERENCE_VERTICAL_SIZE:-${35:-512}}
+MINFERENCE_SLASH_SIZE=${MINFERENCE_SLASH_SIZE:-${36:-2048}}
+MINFERENCE_ADAPTIVE_BUDGET=${MINFERENCE_ADAPTIVE_BUDGET:-${37:-""}}
 
 ATTN_ONLY_LAYER_IDX=${41:-"12"}
-NO_DENSITY=${44:-"true"}
-NO_SELECT_TIME=${45:-"true"}
+NO_DENSITY=${NO_DENSITY:-${44:-"false"}}
+NO_SELECT_TIME=${NO_SELECT_TIME:-${45:-"false"}}
 
 INCLUDE_FLASH=${48:-"true"}
 INCLUDE_MINFERENCE=${49:-"true"}
@@ -43,6 +43,7 @@ INCLUDE_FLEXPREFILL=${50:-"true"}
 INCLUDE_XATTENTION=${51:-"true"}
 INCLUDE_PRISM=${52:-"true"}
 INCLUDE_SPARGE=${53:-"true"}
+INCLUDE_PBSATTN=${54:-"true"}
 
 XATTN_STRIDE=${XATTN_STRIDE:-8}
 XATTN_THRESHOLD=${XATTN_THRESHOLD:-0.9}
@@ -52,6 +53,10 @@ SPARGE_CDFTHRESHD=${SPARGE_CDFTHRESHD:-0.98}
 SPARGE_PVTHRESHD=${SPARGE_PVTHRESHD:-50.0}
 SPARGE_SMOOTH_K=${SPARGE_SMOOTH_K:-"true"}
 SPARGE_ATTENTION_SINK=${SPARGE_ATTENTION_SINK:-"true"}
+
+PBS_SEGMENT_SIZE=${PBS_SEGMENT_SIZE:-256}
+PBS_THRESHOLD=${PBS_THRESHOLD:-0.9}
+
 FORCE_SINK=${FORCE_SINK:-"true"}
 FORCE_RECENT=${FORCE_RECENT:-"true"}
 
@@ -91,8 +96,11 @@ echo "Include FlexPrefill: $INCLUDE_FLEXPREFILL"
 echo "Include XAttention: $INCLUDE_XATTENTION"
 echo "Include Prism: $INCLUDE_PRISM"
 echo "Include SpargeAttn: $INCLUDE_SPARGE"
+echo "Include PbsAttn: $INCLUDE_PBSATTN"
 echo "SpargeAttn SimThreshd: $SPARGE_SIMTHRESHD"
 echo "SpargeAttn CDFThreshd: $SPARGE_CDFTHRESHD"
+echo "PbsAttn Segment Size: $PBS_SEGMENT_SIZE"
+echo "PbsAttn Threshold: $PBS_THRESHOLD"
 echo "================================================================"
 
 ARGS=(
@@ -115,6 +123,8 @@ ARGS=(
     --sparge_simthreshd "$SPARGE_SIMTHRESHD"
     --sparge_cdfthreshd "$SPARGE_CDFTHRESHD"
     --sparge_pvthreshd "$SPARGE_PVTHRESHD"
+    --pbs_segment_size "$PBS_SEGMENT_SIZE"
+    --pbs_threshold "$PBS_THRESHOLD"
     --num_warmup 3
     --num_runs 5
 )
@@ -192,6 +202,9 @@ if [ "$INCLUDE_XATTENTION" = "true" ]; then
 fi
 if [ "$INCLUDE_SPARGE" = "true" ]; then
     if [ -n "$METHODS" ]; then METHODS="$METHODS,SpargeAttn"; else METHODS="SpargeAttn"; fi
+fi
+if [ "$INCLUDE_PBSATTN" = "true" ]; then
+    if [ -n "$METHODS" ]; then METHODS="$METHODS,PbsAttn"; else METHODS="PbsAttn"; fi
 fi
 if [ "$INCLUDE_PRISM" = "true" ]; then
     if [ -n "$METHODS" ]; then METHODS="$METHODS,Prism"; else METHODS="Prism"; fi

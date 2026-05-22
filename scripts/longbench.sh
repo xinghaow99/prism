@@ -26,7 +26,7 @@ fi
 
 export MODEL_ID=$MODEL
 
-export PATCH_TYPE=${PATCH_TYPE:-"prism"} # none, minference, flexprefill, xattn, prism, sparge
+export PATCH_TYPE=${PATCH_TYPE:-"prism"} # none, minference, flexprefill, xattn, prism, sparge, pbs_attn
 export COLLECT_DENSITY=${COLLECT_DENSITY:-"true"}
 
 export LOW_FREQ_DIM=${LOW_FREQ_DIM:-96}
@@ -35,6 +35,10 @@ export BLOCK_SIZE=${BLOCK_SIZE:-128}
 export LOW_FREQ_THRESHOLD=${LOW_FREQ_THRESHOLD:-0.93}
 export HIGH_FREQ_THRESHOLD=${HIGH_FREQ_THRESHOLD:-0.93}
 export CALIBRATE=${CALIBRATE:-"true"}
+
+# PBS-Attn Hyperparameters (when PATCH_TYPE=pbs_attn)
+# export PBS_SEGMENT_SIZE=${PBS_SEGMENT_SIZE:-256}
+# export PBS_THRESHOLD=${PBS_THRESHOLD:-0.9}
 
 export USE_TRITON_SELECT=${USE_TRITON_SELECT:-"true"}
 export USE_TRITON_LOGITS=${USE_TRITON_LOGITS:-"true"}

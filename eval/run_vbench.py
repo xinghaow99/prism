@@ -43,10 +43,10 @@ def parse_args():
                         help="Number of denoising steps")
 
     # Model params
-    parser.add_argument("--model_base", type=str, default="ckpts",
+    parser.add_argument("--model_base", type=str, default="eval/HunyuanVideo/ckpts",
                         help="Path to model checkpoints")
     parser.add_argument("--dit_weight", type=str,
-                        default="ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt",
+                        default="eval/HunyuanVideo/ckpts/hunyuan-video-t2v-720p/transformers/mp_rank_00_model_states.pt",
                         help="Path to DiT weights")
 
     # Sparse attention params

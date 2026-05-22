@@ -4,5 +4,7 @@ build
 results
 tests
 logs
+**/AGENTS.md
+scripts/plot
 # HunyuanVideo model weights (not committed)
 eval/HunyuanVideo/ckpts/

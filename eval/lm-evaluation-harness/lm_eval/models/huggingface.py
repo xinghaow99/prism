@@ -963,7 +963,7 @@ class HFLM(TemplateLM):
 
             assert self.AUTO_MODEL_CLASS in (
                 transformers.AutoModelForCausalLM,
-                transformers.AutoModelForVision2Seq,
+                getattr(transformers, "AutoModelForVision2Seq", None),
             )
             return self.model(inps).logits
 
